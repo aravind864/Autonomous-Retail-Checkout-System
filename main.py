@@ -1,11 +1,35 @@
 import cv2
 import time
 import math
+from urllib.parse import urlparse, urlunparse
 from config import ENTRY_CAMERA_INDEX, SHELF_CAMERA_INDEX, SHELF_MAP, HOST_IP, HOST_PORT
 from state_manager import GlobalStateManager
 from vision_pipeline import VisionSystem
 from sensor_bridge import start_sensor_server
 from checkout import calculate_bill, generate_qr_payment
+
+def normalize_camera_source(source):
+    """Normalize common camera inputs for OpenCV."""
+    s = str(source).strip()
+    if s.isdigit():
+        return s
+
+    parsed = urlparse(s)
+    if parsed.scheme in {"http", "https"}:
+        path = parsed.path or ""
+        if path in {"", "/"}:
+            parsed = parsed._replace(path="/video")
+            return urlunparse(parsed)
+
+    return s
+
+
+def open_camera(source):
+    """Open a webcam index or IP Webcam URL."""
+    s = normalize_camera_source(source)
+    if s.isdigit():
+        return cv2.VideoCapture(int(s), cv2.CAP_DSHOW)
+    return cv2.VideoCapture(s)
 
 # Initialize State and Vision
 state_mgr = GlobalStateManager()
@@ -45,12 +69,28 @@ def handle_sensor_trigger(sensor_id, action):
         state_mgr.update_cart(closest_track_id, product_data, action=cart_action)
 
 def main():
+    # 0. Check if cameras are configured
+    if not ENTRY_CAMERA_INDEX or not SHELF_CAMERA_INDEX:
+        print("\n[ERROR] Camera sources are not configured!")
+        print("  → Run app.py and open http://localhost:5000/admin/login")
+        print("  → Set camera URLs in the Admin Panel, then restart this script.")
+        return
+
     # 1. Start HTTP Listener for Microcontroller
     start_sensor_server(callback=handle_sensor_trigger, host=HOST_IP, port=HOST_PORT)
 
-    # 2. Open Cameras using Windows DirectShow backend
-    cap_entry = cv2.VideoCapture(ENTRY_CAMERA_INDEX, cv2.CAP_DSHOW)
-    cap_shelf = cv2.VideoCapture(SHELF_CAMERA_INDEX, cv2.CAP_DSHOW)
+    # 2. Open Cameras - works for both USB webcams and phone IP streams
+    cap_entry = open_camera(ENTRY_CAMERA_INDEX)
+    cap_shelf  = open_camera(SHELF_CAMERA_INDEX)
+
+    if not cap_entry.isOpened():
+        print(f"[ERROR] Cannot open Entry camera: {ENTRY_CAMERA_INDEX}")
+        print("  → Check the IP in Admin Panel (/admin) and ensure both devices are on same Wi-Fi")
+        return
+    if not cap_shelf.isOpened():
+        print(f"[ERROR] Cannot open Shelf camera: {SHELF_CAMERA_INDEX}")
+        print("  → Check the IP in Admin Panel (/admin) and ensure both devices are on same Wi-Fi")
+        return
 
     # Set Resolution for stability
     cap_entry.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
