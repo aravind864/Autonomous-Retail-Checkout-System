@@ -1,0 +1,54 @@
+/* ============================================================
+   Autonomous Retail – Store Monitoring Dashboard Styles
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #fff;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #00E676;
+    margin-bottom: 20px;
+    font-size: 1.6rem;
+    letter-spacing: 0.5px;
+}
+
+.grid {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.card {
+    background-color: #1E1E1E;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    width: 45%;
+    min-width: 320px;
+}
+
+.card img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 2px solid #333;
+}
+
+.card h2 {
+    margin-top: 10px;
+    font-size: 1.2rem;
+    color: #BB86FC;
+}
