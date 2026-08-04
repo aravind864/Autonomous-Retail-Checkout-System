@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Store Customer App</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .mobile-card { background: #fff; width: 100%; max-width: 380px; border-radius: 20px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px; }
+        .header h2 { margin: 0; color: #2c3e50; }
+        .header p { margin: 5px 0 0; color: #7f8c8d; font-size: 0.9rem; }
+        .cart-list { list-style: none; padding: 0; margin: 0; }
+        .cart-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 1rem; }
+        .total-section { display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: bold; margin-top: 20px; color: #27ae60; }
+        .qr-container { text-align: center; margin-top: 20px; }
+        .qr-container img { width: 180px; height: 180px; border: 1px solid #ddd; padding: 10px; border-radius: 12px; }
+    </style>
+</head>
+<body>
+    <div class="mobile-card">
+        <div class="header">
+            <h2>Smart Retail Cart</h2>
+            <p id="cust-id">Customer: CUST_1</p>
+        </div>
+
+        <ul class="cart-list" id="cart-items">
+            <!-- Items injected dynamically -->
+        </ul>
+
+        <div class="total-section">
+            <span>Total Bill:</span>
+            <span id="cart-total">₹0</span>
+        </div>
+
+        <div class="qr-container" id="qr-box">
+            <p style="color: #888; font-size: 0.85rem;">Scan QR code at exit gate to pay</p>
+            <div id="qr-img-slot"></div>
+        </div>
+    </div>
+
+    <script>
+        const CUSTOMER_ID = "CUST_1"; // Connects to active customer
+
+        async function fetchCart() {
+            try {
+                const res = await fetch(`/api/cart/${CUSTOMER_ID}`);
+                const data = await res.json();
+
+                // Update Cart Items
+                const listEl = document.getElementById('cart-items');
+                listEl.innerHTML = '';
+                
+                if (data.cart.length === 0) {
+                    listEl.innerHTML = '<li class="cart-item" style="color: #999;">Your cart is empty</li>';
+                } else {
+                    data.cart.forEach(item => {
+                        listEl.innerHTML += `
+                            <li class="cart-item">
+                                <span>${item.product_name}</span>
+                                <span>₹${item.price}</span>
+                            </li>`;
+                    });
+                }
+
+                // Update Total
+                document.getElementById('cart-total').innerText = `₹${data.total}`;
+
+                // Update Payment QR Code
+                const qrSlot = document.getElementById('qr-img-slot');
+                if (data.qr_code_base64) {
+                    qrSlot.innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" alt="Payment QR">`;
+                } else {
+                    qrSlot.innerHTML = '<p style="color:#aaa; font-size:0.8rem;">Add items to generate payment QR</p>';
+                }
+            } catch (e) {
+                console.error("Cart sync error", e);
+            }
+        }
+
+        // Auto-refresh cart every 1 second
+        setInterval(fetchCart, 1000);
+        fetchCart();
+    </script>
+</body>
+</html>
