@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Autonomous Retail AI – Live store surveillance and customer tracking dashboard.">
+    <title>Autonomous Retail – Monitoring Dashboard</title>
+    <!-- External Stylesheet (served from static/css/) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <h1>Autonomous Retail AI Surveillance &amp; Tracking</h1>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Camera 1: Entry / Exit (Customer ReID)</h2>
+            <img src="/video_feed_entry" alt="Camera 1 – Entry/Exit Live Stream">
+        </div>
+        <div class="card">
+            <h2>Camera 2: Shelf Area (Pose &amp; Interaction)</h2>
+            <img src="/video_feed_shelf" alt="Camera 2 – Shelf Area Live Stream">
+        </div>
+    </div>
+</body>
+</html>
