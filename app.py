@@ -31,17 +31,9 @@ ADMIN_PASS = os.getenv("ADMIN_PASS", "__SET_ADMIN_PASS__")
 state_mgr = GlobalStateManager()
 vision_sys = VisionSystem(state_mgr)
 
-# ─── Camera Management ───
-cap_entry = None
-cap_shelf = None
-
+# ─── Camera Utility (used only by admin test-camera API) ───
 def normalize_camera_source(source):
-    """Normalize common camera inputs.
-
-    - USB webcams stay numeric (e.g. '0', '1').
-    - IP Webcam base URLs like 192.168.1.100:8080 or http://192.168.1.100:8080 get http:// and /video.
-    - Placeholder strings like 'YOUR_PHONE_IP' or empty strings return ''.
-    """
+    """Normalize common camera inputs (kept for admin API camera test)."""
     if source is None:
         return ""
     s = str(source).strip()
@@ -49,69 +41,20 @@ def normalize_camera_source(source):
         return ""
     if s.isdigit():
         return s
-
     if not (s.startswith("http://") or s.startswith("https://") or s.startswith("rtsp://")):
         s = "http://" + s
-
     parsed = urlparse(s)
     if parsed.scheme in {"http", "https"}:
         path = parsed.path or ""
         if path in {"", "/"}:
             parsed = parsed._replace(path="/video")
             return urlunparse(parsed)
-
     return s
 
-
-def open_camera(source):
-    """Open a camera source with the correct backend (USB vs IP)."""
-    s = normalize_camera_source(source)
-    if not s:
-        return None
-    if s.isdigit():
-        return cv2.VideoCapture(int(s), cv2.CAP_DSHOW)
-    else:
-        # Open IP webcam stream
-        cap = cv2.VideoCapture(s, cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(s)
-        return cap
-
-
 def reset_cameras():
-    """Release active camera captures so get_cameras() opens fresh streams."""
-    global cap_entry, cap_shelf
-    if cap_entry is not None:
-        try:
-            cap_entry.release()
-        except Exception:
-            pass
-        cap_entry = None
-    if cap_shelf is not None:
-        try:
-            cap_shelf.release()
-        except Exception:
-            pass
-        cap_shelf = None
-
-def get_cameras():
-    """Return current camera captures, reopening if needed from config.json."""
-    global cap_entry, cap_shelf
-    cfg = config.reload()
-    entry_src = cfg.get("entry_camera", "")
-    shelf_src = cfg.get("shelf_camera", "")
-
-    # Reopen entry camera if not opened or not working
-    if cap_entry is None or not cap_entry.isOpened():
-        if entry_src:
-            cap_entry = open_camera(entry_src)
-
-    # Reopen shelf camera if not opened or not working
-    if cap_shelf is None or not cap_shelf.isOpened():
-        if shelf_src:
-            cap_shelf = open_camera(shelf_src)
-
-    return cap_entry, cap_shelf
+    """Signal CameraStream threads to re-read config on next cycle.
+    Camera streams are self-managed — they detect source changes automatically."""
+    print("[INFO] reset_cameras() called — CameraStream threads will reload config on next cycle.")
 
 
 # ─── Auth Decorator ───
@@ -124,52 +67,29 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# --- Frame Generators for Web Video Streaming ---
+# ── Frame Generators ────────────────────────────────────────────────────────
+# Each call to get_jpeg() composites: newest raw frame + cached YOLO boxes.
+# Raw frame is from grab_thread (camera native FPS, no YOLO delay).
+# YOLO boxes are from yolo_thread (updated async, ~1fps CPU / ~60fps GPU).
+# Result: stream is always current — zero delay even when YOLO is slow.
+
 def generate_entry_frames():
     while True:
-        entry, _ = get_cameras()
-        if entry is None or not entry.isOpened():
-            time.sleep(0.5)
-            continue
-        success, frame = entry.read()
-        if not success:
-            print("[WARN] Entry camera read failed. Reconnecting...")
-            try:
-                entry.release()
-            except Exception:
-                pass
-            global cap_entry
-            cap_entry = None
-            time.sleep(0.5)
-            continue
-        annotated_frame = vision_sys.process_entry_camera(frame)
-        ret, buffer = cv2.imencode('.jpg', annotated_frame)
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        jpg = vision_sys.entry_get_jpeg()
+        if jpg is not None:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+        time.sleep(0.033)
 
 def generate_shelf_frames():
     while True:
-        _, shelf = get_cameras()
-        if shelf is None or not shelf.isOpened():
-            time.sleep(0.5)
-            continue
-        success, frame = shelf.read()
-        if not success:
-            print("[WARN] Shelf camera read failed. Reconnecting...")
-            try:
-                shelf.release()
-            except Exception:
-                pass
-            global cap_shelf
-            cap_shelf = None
-            time.sleep(0.5)
-            continue
-        annotated_frame = vision_sys.process_shelf_camera(frame)
-        ret, buffer = cv2.imencode('.jpg', annotated_frame)
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        jpg = vision_sys.shelf_get_jpeg()
+        if jpg is not None:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+        time.sleep(0.033)
+
+
 
 # --- Routes ---
 @app.route('/')
@@ -296,7 +216,7 @@ def api_current_config():
 @app.route('/weight_event', methods=['POST'])
 def handle_weight_event():
     """Endpoint for ESP32 / Load Cell HTTP requests."""
-    data = request.json
+    data = request.json or {}
     sensor_id = data.get('sensor_id')
     action = data.get('action')
     
@@ -312,7 +232,7 @@ def handle_weight_event():
             state_mgr.register_customer("CUST_1")
             state_mgr.link_track_to_customer(1, "CUST_1")
     else:
-        sensor_x, sensor_y = product_data["pos_x"], product_data["pos_y"]
+        sensor_x, sensor_y = product_data.get("pos_x", 0), product_data.get("pos_y", 0)
         closest_track_id = None
         min_distance = float('inf')
         for track_id, pos in latest_tracks.items():
@@ -328,6 +248,75 @@ def handle_weight_event():
     return jsonify({"status": "success"}), 200
 
 
+@app.route('/api/dashboard_status')
+@admin_required
+def api_dashboard_status():
+    """Returns live status of customer carts, tracks, and motion state for dashboard polling."""
+    from checkout import calculate_bill
+    carts = state_mgr.get_all_carts()
+    
+    formatted_carts = {}
+    total_revenue = 0
+    total_items_count = 0
+    
+    for cust_id, items in carts.items():
+        subtotal = calculate_bill(items)
+        formatted_carts[cust_id] = {
+            "items": items,
+            "subtotal": subtotal,
+            "item_count": len(items)
+        }
+        total_revenue += subtotal
+        total_items_count += len(items)
+
+    # Read live motion state from the shared BatchedDetector
+    with vision_sys.detector._det_lock:
+        cam1_state = dict(vision_sys.detector._state["cam1"])
+        cam2_state = dict(vision_sys.detector._state["cam2"])
+
+    entry_moving = "MOTION" in cam1_state.get("badge", "")
+    shelf_moving = "MOTION" in cam2_state.get("badge", "")
+
+    return jsonify({
+        "status": "online",
+        "active_customers": len(carts),
+        "total_items": total_items_count,
+        "total_revenue": total_revenue,
+        "carts": formatted_carts,
+        "tracks": vision_sys.get_latest_shelf_tracks(),
+        "motion_state": {
+            "entry_camera_moving": entry_moving,
+            "shelf_camera_moving": shelf_moving,
+            "entry_badge": cam1_state.get("badge", ""),
+            "shelf_badge": cam2_state.get("badge", "")
+        }
+    })
+
+
+@app.route('/api/checkout/<customer_id>', methods=['GET', 'POST'])
+@admin_required
+def api_checkout(customer_id):
+    """Generates dynamic itemized receipt and UPI QR payment code for customer."""
+    from checkout import calculate_bill, generate_qr_base64
+    cart = state_mgr.get_cart(customer_id)
+    total = calculate_bill(cart)
+    
+    if request.method == 'POST':
+        # Clear cart on successful payment confirmation
+        if customer_id in state_mgr.shopping_carts:
+            state_mgr.shopping_carts[customer_id] = []
+        return jsonify({"status": "success", "message": f"Customer {customer_id} cart checked out and cleared."})
+        
+    qr_base64 = generate_qr_base64(total, customer_id)
+    
+    return jsonify({
+        "customer_id": customer_id,
+        "items": cart,
+        "total_amount": total,
+        "qr_code": qr_base64
+    })
+
+
 if __name__ == '__main__':
     print(f"[SYSTEM] Starting Autonomous Retail Web Server on http://{HOST_IP}:{HOST_PORT}")
     print(f"[ADMIN]  Admin Panel -> http://localhost:{HOST_PORT}/admin/login")
@@ -336,3 +325,4 @@ if __name__ == '__main__':
     if isinstance(app.secret_key, (bytes, bytearray)):
         print("[INFO] Flask secret key is generated per process because FLASK_SECRET_KEY is not set.")
     app.run(host=HOST_IP, port=HOST_PORT, debug=False, threaded=True)
+
