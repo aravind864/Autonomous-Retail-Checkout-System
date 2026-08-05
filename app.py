@@ -38,12 +38,20 @@ cap_shelf = None
 def normalize_camera_source(source):
     """Normalize common camera inputs.
 
-    - USB webcams stay numeric.
-    - IP Webcam base URLs such as http://host:8080 become http://host:8080/video.
+    - USB webcams stay numeric (e.g. '0', '1').
+    - IP Webcam base URLs like 192.168.1.100:8080 or http://192.168.1.100:8080 get http:// and /video.
+    - Placeholder strings like 'YOUR_PHONE_IP' or empty strings return ''.
     """
+    if source is None:
+        return ""
     s = str(source).strip()
+    if not s or "YOUR_PHONE_IP" in s:
+        return ""
     if s.isdigit():
         return s
+
+    if not (s.startswith("http://") or s.startswith("https://") or s.startswith("rtsp://")):
+        s = "http://" + s
 
     parsed = urlparse(s)
     if parsed.scheme in {"http", "https"}:
@@ -57,13 +65,34 @@ def normalize_camera_source(source):
 
 def open_camera(source):
     """Open a camera source with the correct backend (USB vs IP)."""
-    if source is None or str(source).strip() == "":
-        return None
     s = normalize_camera_source(source)
+    if not s:
+        return None
     if s.isdigit():
         return cv2.VideoCapture(int(s), cv2.CAP_DSHOW)
     else:
-        return cv2.VideoCapture(s)
+        # Open IP webcam stream
+        cap = cv2.VideoCapture(s, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(s)
+        return cap
+
+
+def reset_cameras():
+    """Release active camera captures so get_cameras() opens fresh streams."""
+    global cap_entry, cap_shelf
+    if cap_entry is not None:
+        try:
+            cap_entry.release()
+        except Exception:
+            pass
+        cap_entry = None
+    if cap_shelf is not None:
+        try:
+            cap_shelf.release()
+        except Exception:
+            pass
+        cap_shelf = None
 
 def get_cameras():
     """Return current camera captures, reopening if needed from config.json."""
@@ -83,6 +112,7 @@ def get_cameras():
             cap_shelf = open_camera(shelf_src)
 
     return cap_entry, cap_shelf
+
 
 # ─── Auth Decorator ───
 def admin_required(f):
@@ -201,19 +231,22 @@ def admin_panel():
 @app.route('/admin/api/save-cameras', methods=['POST'])
 @admin_required
 def api_save_cameras():
-    """Save camera URLs/indices to config.local.json."""
+    """Save camera URLs/indices directly to config.json and reset active streams."""
     data = request.json
-    entry_cam = data.get('entry_cam', '').strip()
-    shelf_cam = data.get('shelf_cam', '').strip()
+    entry_cam = normalize_camera_source(data.get('entry_cam', ''))
+    shelf_cam = normalize_camera_source(data.get('shelf_cam', ''))
 
     if not entry_cam or not shelf_cam:
         return jsonify({"status": "error", "message": "Both camera fields are required."}), 400
 
     try:
         save_camera_config(entry_cam, shelf_cam)
-        return jsonify({"status": "success", "message": "Camera config saved."})
+        reset_cameras()
+        return jsonify({"status": "success", "message": "Camera config saved to config.json and live streams updated."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
 
 @app.route('/admin/api/test-cameras', methods=['POST'])
 @admin_required

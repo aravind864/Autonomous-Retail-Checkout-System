@@ -1,18 +1,16 @@
 # Autonomous Retail Checkout System
 
-## Safe setup for local or public use
+## Configuration & Usage
 
-1. Keep your private camera settings out of git.
-2. Put real camera values in `config.local.json`.
-3. Copy `config.example.json` to `config.local.json` and edit that file locally.
-4. Set these environment variables before running in shared or public environments:
+1. Copy `.env.example` to `.env` to configure your environment secrets:
    - `FLASK_SECRET_KEY`
-   - `ADMIN_USER`
-   - `ADMIN_PASS`
-5. Do not commit `config.local.json`.
+   - `ADMIN_USER` (Default: `admin`)
+   - `ADMIN_PASS` (Default: `admin`)
+   - `HOST_IP`
+   - `HOST_PORT`
 
-## Camera configuration
+2. Camera Configuration:
+   - Camera sources are saved directly to `config.json` via the Admin Panel at `http://localhost:5000/admin`.
+   - Camera settings update live instantly in the Surveillance Dashboard without requiring a server restart.
+   - The application normalizes base IP Webcam URLs (e.g. `http://HOST:8080` to `http://HOST:8080/video`).
 
-- `config.json` contains public-safe placeholder values.
-- The admin panel saves live settings to `config.local.json`.
-- The app normalizes base IP Webcam URLs like `http://HOST:8080` to `http://HOST:8080/video`.
