@@ -66,8 +66,9 @@
                 const data = await response.json();
 
                 if (response.ok && data.status === 'success') {
-                    showToast('camera-toast', '✓ Camera settings saved to config.local.json — restart the server to apply changes.', 'success');
+                    showToast('camera-toast', '✓ Camera settings saved to config.json and live streams updated!', 'success');
                 } else {
+
                     showToast('camera-toast', data.message || 'Failed to save settings.', 'error');
                 }
             } catch (err) {

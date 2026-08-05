@@ -1,6 +1,7 @@
 {
-    "entry_camera": "http://YOUR_PHONE_IP:8080/video",
-    "shelf_camera": "http://YOUR_PHONE_IP:8080/video",
+    "entry_camera": "",
+    "shelf_camera": "",
+
     "shelf_map": {
         "SENSOR_01": {
             "product_name": "Lays Chips",
