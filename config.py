@@ -4,9 +4,15 @@ Existing imports like `from config import ENTRY_CAMERA_INDEX` continue to work.
 """
 import json
 import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 _BASE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 _LOCAL_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.local.json")
+
 
 _DEFAULT_CONFIG = {
     "entry_camera": "",
