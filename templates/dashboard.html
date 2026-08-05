@@ -1,25 +1,124 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Autonomous Retail AI – Live store surveillance and customer tracking dashboard.">
-    <title>Autonomous Retail – Monitoring Dashboard</title>
-    <!-- External Stylesheet (served from static/css/) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <meta name="description" content="Autonomous Retail AI – Live store surveillance dashboard.">
+    <title>Surveillance Dashboard – Autonomous Retail</title>
+    <!-- Tailwind CSS v3 via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
 </head>
-<body>
-    <h1>Autonomous Retail AI Surveillance &amp; Tracking</h1>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
 
-    <div class="grid">
-        <div class="card">
-            <h2>Camera 1: Entry / Exit (Customer ReID)</h2>
-            <img src="/video_feed_entry" alt="Camera 1 – Entry/Exit Live Stream">
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 sm:px-8 py-3.5">
+        <div class="max-w-[1800px] mx-auto flex items-center justify-between">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-lg font-bold text-white tracking-tight">Autonomous Retail</h1>
+            </div>
+
+            <!-- Navigation Links -->
+            <div class="flex items-center gap-3">
+                <a href="/admin" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/60 text-slate-200 text-xs font-semibold transition-all hover:scale-105 active:scale-95">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>Admin Panel</span>
+                </a>
+            </div>
+
         </div>
-        <div class="card">
-            <h2>Camera 2: Shelf Area (Pose &amp; Interaction)</h2>
-            <img src="/video_feed_shelf" alt="Camera 2 – Shelf Area Live Stream">
+    </header>
+
+    <!-- Main Large Camera Feeds Viewport -->
+    <main class="flex-1 max-w-[1800px] w-full mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            
+            <!-- Camera 1: Entry / Exit Cam -->
+            <div class="glass-panel rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-4 flex flex-col">
+                <!-- Header -->
+                <div class="flex items-center justify-between px-1">
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2.5">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        Entry / Exit Cam
+                    </h2>
+                    <span class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        LIVE
+                    </span>
+                </div>
+
+                <!-- Large Video Stream Viewport -->
+                <div class="relative w-full aspect-video min-h-[380px] sm:min-h-[460px] lg:min-h-[520px] rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner">
+                    <img src="/video_feed_entry" alt="Entry / Exit Cam Stream" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\'text-center p-8\'><svg class=\'w-14 h-14 mx-auto text-slate-600 mb-3\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z\'></path></svg><p class=\'text-sm font-semibold text-slate-400\'>Entry / Exit Cam Offline</p><p class=\'text-xs text-slate-500 mt-1\'>Configure stream URL in Admin Panel</p></div>';">
+                </div>
+            </div>
+
+            <!-- Camera 2: Shelf 1 Cam -->
+            <div class="glass-panel rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-4 flex flex-col">
+                <!-- Header -->
+                <div class="flex items-center justify-between px-1">
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2.5">
+                        <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
+                        Shelf 1 Cam
+                    </h2>
+                    <span class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        LIVE
+                    </span>
+                </div>
+
+                <!-- Large Video Stream Viewport -->
+                <div class="relative w-full aspect-video min-h-[380px] sm:min-h-[460px] lg:min-h-[520px] rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner">
+                    <img src="/video_feed_shelf" alt="Shelf 1 Cam Stream" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\'text-center p-8\'><svg class=\'w-14 h-14 mx-auto text-slate-600 mb-3\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z\'></path></svg><p class=\'text-sm font-semibold text-slate-400\'>Shelf 1 Cam Offline</p><p class=\'text-xs text-slate-500 mt-1\'>Configure stream URL in Admin Panel</p></div>';">
+                </div>
+            </div>
+
         </div>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-4 px-6 text-center text-xs text-slate-500">
+        Autonomous Retail AI System
+    </footer>
+
 </body>
 </html>
+
+
+

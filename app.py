@@ -8,8 +8,14 @@ import functools
 import os
 import time
 from urllib.parse import urlparse, urlunparse
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import config
+
 from config import ENTRY_CAMERA_INDEX, SHELF_CAMERA_INDEX, SHELF_MAP, HOST_IP, HOST_PORT
 from config import save_camera_config
 from state_manager import GlobalStateManager
@@ -141,11 +147,6 @@ def generate_shelf_frames():
 def dashboard():
     """Renders Store Monitoring Dashboard."""
     return render_template('dashboard.html')
-
-@app.route('/app')
-def customer_app():
-    """Renders Customer Mobile Application UI."""
-    return render_template('customer_app.html')
 
 @app.route('/video_feed_entry')
 @admin_required
@@ -293,27 +294,6 @@ def handle_weight_event():
 
     return jsonify({"status": "success"}), 200
 
-@app.route('/api/cart/<customer_id>', methods=['GET'])
-def get_cart(customer_id):
-    """Returns active cart and dynamic payment QR code for mobile app."""
-    cart = state_mgr.get_cart(customer_id)
-    total = sum(item['price'] for item in cart)
-    
-    # Generate QR Code as Base64 image string
-    qr_b64 = ""
-    if total > 0:
-        upi_url = f"upi://pay?pa=store@upi&pn=AutonomousRetail&am={total}"
-        qr = qrcode.make(upi_url)
-        buf = io.BytesIO()
-        qr.save(buf, format='PNG')
-        qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    return jsonify({
-        "customer_id": customer_id,
-        "cart": cart,
-        "total": total,
-        "qr_code_base64": qr_b64
-    })
 
 if __name__ == '__main__':
     print(f"[SYSTEM] Starting Autonomous Retail Web Server on http://{HOST_IP}:{HOST_PORT}")
