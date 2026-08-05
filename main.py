@@ -106,13 +106,13 @@ def main():
 
         # Safely process Camera 1
         if ret_entry and frame_entry is not None:
-            vision_sys.process_entry_camera(frame_entry)
-            cv2.imshow("Camera 1 - Entry/Exit", frame_entry)
+            ann_entry = vision_sys.process_entry_camera(frame_entry)
+            cv2.imshow("Camera 1 - Entry/Exit", ann_entry)
 
         # Safely process Camera 2
         if ret_shelf and frame_shelf is not None:
-            vision_sys.process_shelf_camera(frame_shelf)
-            cv2.imshow("Camera 2 - Shelf View", frame_shelf)
+            ann_shelf = vision_sys.process_shelf_camera(frame_shelf)
+            cv2.imshow("Camera 2 - Shelf View", ann_shelf)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
