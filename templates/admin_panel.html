@@ -115,19 +115,19 @@
                 <div class="space-y-2">
                     <label for="entry-cam" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
                         <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px]">CAM 1</span>
-                        Entry / Exit Cam URL
+                        Entry / Exit Cam URL or Video File
                     </label>
-                    <input type="text" id="entry-cam" name="entry_cam" value="{{ entry_cam }}" placeholder="e.g. rtsp://192.168.x.x:8080/h264_ulaw.sdp" class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 text-sm font-mono focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
+                    <input type="text" id="entry-cam" name="entry_cam" value="{{ entry_cam }}" placeholder="e.g. C:/Videos/test1.mp4 OR rtsp://..." class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 text-sm font-mono focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
                     <div class="grid grid-cols-2 gap-2 mt-2">
                         <div class="p-2 rounded-lg bg-emerald-900/20 border border-emerald-700/30 text-[10px] font-mono">
-                            <span class="text-emerald-400 font-bold">✅ LOW LATENCY</span><br>
-                            <span class="text-emerald-300">rtsp://IP:8080/h264_ulaw.sdp</span><br>
+                            <span class="text-emerald-400 font-bold">✅ LOCAL VIDEO / WEBCAM</span><br>
+                            <span class="text-emerald-300">C:/path/to/video.mp4</span><br>
                             <span class="text-slate-400">USB webcam: 0 or 1</span>
                         </div>
-                        <div class="p-2 rounded-lg bg-red-900/20 border border-red-700/30 text-[10px] font-mono">
-                            <span class="text-red-400 font-bold">⚠️ HIGH LATENCY (~30s)</span><br>
-                            <span class="text-red-300">http://IP:8080/video</span><br>
-                            <span class="text-slate-400">HTTP/MJPEG — avoid if possible</span>
+                        <div class="p-2 rounded-lg bg-indigo-900/20 border border-indigo-700/30 text-[10px] font-mono">
+                            <span class="text-indigo-400 font-bold">🌐 IP CAMERAS</span><br>
+                            <span class="text-indigo-300">rtsp://IP:8080/h264_ulaw.sdp</span><br>
+                            <span class="text-slate-400">Low latency streaming</span>
                         </div>
                     </div>
                 </div>
@@ -136,13 +136,12 @@
                 <div class="space-y-2">
                     <label for="shelf-cam" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
                         <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px]">CAM 2</span>
-                        Shelf 1 Cam URL
+                        Shelf 1 Cam URL or Video File
                     </label>
-                    <input type="text" id="shelf-cam" name="shelf_cam" value="{{ shelf_cam }}" placeholder="e.g. rtsp://192.168.x.x:8080/h264_ulaw.sdp" class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 text-sm font-mono focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all">
+                    <input type="text" id="shelf-cam" name="shelf_cam" value="{{ shelf_cam }}" placeholder="e.g. C:/Videos/test2.mp4 OR rtsp://..." class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 text-sm font-mono focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all">
                     <div class="p-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-[10px] font-mono mt-2 text-slate-400">
-                        💡 <span class="text-yellow-400 font-bold">IP Webcam app (Android):</span>
-                        Open app → tap <span class="text-white">▶ Start server</span> → use <span class="text-emerald-400">rtsp://YOUR_IP:8080/h264_ulaw.sdp</span> for lowest latency.<br>
-                        <span class="text-blue-400 font-bold">DroidCam USB:</span> connect via USB cable → use index <span class="text-white">1</span> or <span class="text-white">2</span> (zero network delay).
+                        💡 <span class="text-yellow-400 font-bold">Video Testing:</span>
+                        Paste the <span class="text-white">absolute path</span> to a local video file (e.g. <span class="text-emerald-400">C:/my_videos/shelf_test.mp4</span>). It will loop automatically.<br>
                     </div>
                 </div>
 
