@@ -1,123 +1,172 @@
-"""
-reid_engine.py
---------------
-OSNet / Deep Feature Embedding + Cosine Similarity Re-Identification Engine.
+"""Cross-camera person re-identification — matches Camera 2 tracks to
+Camera 1 face-verified customers via body appearance + shape features."""
+from __future__ import annotations
 
-Matches persons across different camera streams (Entry Camera & Shelf Camera)
-by extracting deep visual feature vectors for each person crop and computing
-Cosine Similarity matching against a gallery of known customer embeddings.
-"""
+import time
+from collections import defaultdict
+from typing import Optional
 
 import cv2
-import torch
 import numpy as np
-import torchvision.transforms as T
+import torch
 import torchvision.models as models
+import torchvision.transforms as T
+
 
 class PersonReIDEngine:
-    def __init__(self, sim_threshold: float = 0.45):
-        """
-        Initialize Deep ReID Feature Extractor using lightweight CNN backbone.
-        sim_threshold: Cosine similarity threshold (0.0 to 1.0) for matching.
-        """
+    """Aggregate body evidence and associate Camera 2 tracks with Camera 1."""
+    W_APPEARANCE, W_SHAPE, W_TIME, W_ROUTE = 0.40, 0.30, 0.15, 0.15
+    MATCH_THRESHOLD, UNCERTAIN_THRESHOLD = 0.75, 0.50
+
+    def __init__(self, sim_threshold: float = MATCH_THRESHOLD):
         self.sim_threshold = sim_threshold
-        self.device = torch.device("cpu")
-
-        print("[REID] Initializing OSNet / Deep Feature ReID Engine ...")
-        # Lightweight MobileNetV3 backbone for real-time CPU feature extraction
-        backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-        self.feature_extractor = backbone.features
-        self.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
-        self.feature_extractor.eval()
-
-        # ReID Input Preprocessing (256x128 standard ReID resolution)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.min_samples = 4
+        self.max_samples = 12
+        self.min_travel_seconds = 0.0
+        self.max_travel_seconds = 300.0
         self.transform = T.Compose([
-            T.ToPILImage(),
-            T.Resize((256, 128)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            T.ToPILImage(), T.Resize((256, 128)), T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
+        self._build_appearance_model()
+        self.gallery: dict[str, dict] = {}
+        self.track_to_cid: dict[int, str] = {}
+        self._samples: dict[int, dict] = defaultdict(self._new_sample_buffer)
 
-        # Gallery mapping: customer_id -> L2-normalized feature vector (np.ndarray)
-        self.gallery = {}
-        # Track ID to Customer ID cache mapping
-        self.track_to_cid = {}
-        self._next_cust_idx = 1
-        print("[REID] Re-Identification Engine ready.")
+    def _build_appearance_model(self) -> None:
+        """Load OSNet if available, otherwise fall back to MobileNetV3."""
+        try:
+            import torchreid
+            name = "osnet_x0_25"
+            self.feature_extractor = torchreid.models.build_model(
+                name=name, num_classes=1000, loss="softmax", pretrained=True
+            ).to(self.device).eval()
+            self.pool = None
+            print(f"[REID] Using OSNet appearance model: {name}")
+            return
+        except Exception as exc:
+            print(f"[REID] OSNet unavailable ({exc}); using MobileNetV3 appearance fallback.")
+        try:
+            backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
+        except Exception as exc:
+            print(f"[REID] Pretrained MobileNet unavailable ({exc}); using local fallback.")
+            backbone = models.mobilenet_v3_small(weights=None)
+        self.feature_extractor = backbone.features.to(self.device).eval()
+        self.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
+
+    @staticmethod
+    def _new_sample_buffer() -> dict:
+        return {"appearance": [], "shape": [], "last_seen": time.monotonic()}
 
     @torch.no_grad()
-    def extract_embedding(self, crop: np.ndarray) -> np.ndarray:
-        """Extract 576-dim L2-normalized feature embedding for a person crop."""
-        if crop is None or crop.size == 0 or crop.shape[0] < 15 or crop.shape[1] < 15:
+    def extract_embedding(self, crop: np.ndarray) -> Optional[np.ndarray]:
+        if crop is None or crop.size == 0 or crop.shape[0] < 24 or crop.shape[1] < 12:
             return None
-
         try:
-            # Convert BGR -> RGB
             rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
             tensor = self.transform(rgb).unsqueeze(0).to(self.device)
-
-            # Extract features
             feat = self.feature_extractor(tensor)
-            feat = self.pool(feat).flatten(1)
-
-            # L2 Normalization
-            norm = torch.norm(feat, p=2, dim=1, keepdim=True)
-            feat_norm = (feat / (norm + 1e-6)).cpu().numpy().flatten()
-            return feat_norm
-        except Exception as e:
+            if self.pool is not None:
+                feat = self.pool(feat)
+            feat = feat.flatten(1)
+            feat = feat / (torch.norm(feat, p=2, dim=1, keepdim=True) + 1e-6)
+            return feat.cpu().numpy().flatten()
+        except Exception as exc:
+            print(f"[REID] Appearance extraction failed: {exc}")
             return None
 
-    def match_or_register(self, frame: np.ndarray, bbox: tuple, track_id: int, state_mgr=None) -> str:
-        """
-        Crop person region from frame, extract feature vector, and match via Cosine Similarity.
-        Returns persistent customer ID (e.g. CUST_1).
-        """
-        # If this track ID is already matched in cache, return it
-        if track_id in self.track_to_cid:
-            return self.track_to_cid[track_id]
+    @staticmethod
+    def _extract_shape_feature(crop: np.ndarray) -> np.ndarray:
+        """Aspect ratio + eight-band edge silhouette profile."""
+        if crop is None or crop.size == 0:
+            return np.ones(9, dtype=np.float32) / 3.0
+        edges = cv2.Canny(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), 50, 120)
+        widths = []
+        for band in np.array_split(edges, 8, axis=0):
+            cols = np.where(np.any(band > 0, axis=0))[0]
+            widths.append((cols[-1] - cols[0] + 1) / max(1, crop.shape[1]) if cols.size else 0.0)
+        descriptor = np.asarray([crop.shape[1] / max(1.0, float(crop.shape[0])), *widths], dtype=np.float32)
+        return descriptor / (np.linalg.norm(descriptor) + 1e-6)
 
+    def register_gallery_feature(self, cid: str, emb: np.ndarray, crop: np.ndarray) -> None:
+        """Register a Camera 1 customer as a Camera 2 re-ID candidate."""
+        if not cid or cid.startswith("TRACK_") or emb is None:
+            return
+        shape = self._extract_shape_feature(crop)
+        old = self.gallery.get(cid)
+        if old:
+            emb = 0.80 * old["appearance"] + 0.20 * emb
+            emb /= np.linalg.norm(emb) + 1e-6
+            shape = 0.80 * old["shape"] + 0.20 * shape
+            shape /= np.linalg.norm(shape) + 1e-6
+        self.gallery[cid] = {"appearance": emb, "shape": shape, "entered_at": time.time()}
+
+    @staticmethod
+    def _crop(frame: np.ndarray, bbox: tuple) -> np.ndarray:
         x1, y1, x2, y2 = bbox
         h, w = frame.shape[:2]
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
+        return frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
 
-        crop = frame[y1:y2, x1:x2]
-        emb = self.extract_embedding(crop)
+    @staticmethod
+    def _mean_normalized(features: list[np.ndarray]) -> Optional[np.ndarray]:
+        if not features:
+            return None
+        mean = np.mean(features, axis=0)
+        return mean / (np.linalg.norm(mean) + 1e-6)
 
-        if emb is None:
-            cid = f"CUST_{track_id}"
-            self.track_to_cid[track_id] = cid
-            if state_mgr and cid not in state_mgr.track_to_customer.values():
-                state_mgr.register_customer(cid)
-                state_mgr.link_track_to_customer(track_id, cid)
-            return cid
+    def _active_candidates(self, state_mgr) -> dict[str, dict]:
+        if state_mgr is None:
+            return dict(self.gallery)
+        active = set(state_mgr.get_active_customers())
+        return {cid: profile for cid, profile in self.gallery.items() if cid in active}
 
-        best_cid = None
-        best_sim = -1.0
+    def associate_cam2_track(self, frame: np.ndarray, bbox: tuple, track_id: int,
+                             display_track_id: str, state_mgr=None) -> tuple[str, str]:
+        """Match a Camera 2 track to a Camera 1 customer. Returns (display_id, status)."""
+        if track_id in self.track_to_cid:
+            return self.track_to_cid[track_id], "MATCHED"
+        embedding = self.extract_embedding(self._crop(frame, bbox))
+        if embedding is None:
+            return display_track_id, "COLLECTING"
+        sample = self._samples[track_id]
+        sample["last_seen"] = time.monotonic()
+        sample["appearance"].append(embedding)
+        sample["shape"].append(self._extract_shape_feature(self._crop(frame, bbox)))
+        sample["appearance"] = sample["appearance"][-self.max_samples:]
+        sample["shape"] = sample["shape"][-self.max_samples:]
+        if len(sample["appearance"]) < self.min_samples:
+            return display_track_id, f"COLLECTING {len(sample['appearance'])}/{self.min_samples}"
+        candidates = self._active_candidates(state_mgr)
+        if not candidates:
+            return display_track_id, "NO CAM1 CANDIDATE"
+        app, shape, now = self._mean_normalized(sample["appearance"]), self._mean_normalized(sample["shape"]), time.time()
+        best_cid, best_score = None, -1.0
+        for cid, profile in candidates.items():
+            elapsed = now - profile["entered_at"]
+            if elapsed < self.min_travel_seconds or elapsed > self.max_travel_seconds:
+                continue
+            s_app = max(0.0, float(np.dot(app, profile["appearance"])))
+            s_shape = max(0.0, float(np.dot(shape, profile["shape"])))
+            s_time = max(0.0, 1.0 - elapsed / self.max_travel_seconds)
+            score = self.W_APPEARANCE * s_app + self.W_SHAPE * s_shape + self.W_TIME * s_time + self.W_ROUTE
+            if score > best_score:
+                best_cid, best_score = cid, score
+        if best_cid is not None and best_score >= self.MATCH_THRESHOLD:
+            self.track_to_cid[track_id] = best_cid
+            if state_mgr:
+                state_mgr.link_track_to_customer(track_id, best_cid)
+            print(f"[REID MATCH] {display_track_id} -> {best_cid} (S={best_score:.2f})")
+            return best_cid, f"MATCH {best_score:.2f}"
+        if best_cid is not None and best_score >= self.UNCERTAIN_THRESHOLD:
+            return display_track_id, f"UNCERTAIN {best_score:.2f}"
+        return display_track_id, "NO MATCH"
 
-        # Compute Cosine Similarity against all customer embeddings in gallery
-        for cid, gal_emb in self.gallery.items():
-            sim = float(np.dot(emb, gal_emb))
-            if sim > best_sim:
-                best_sim = sim
-                best_cid = cid
-
-        if best_sim >= self.sim_threshold and best_cid is not None:
-            # Match found! Update profile using exponential moving average (EMA)
-            self.gallery[best_cid] = 0.85 * self.gallery[best_cid] + 0.15 * emb
-            self.gallery[best_cid] /= (np.linalg.norm(self.gallery[best_cid]) + 1e-6)
-            cid = best_cid
-            print(f"[REID MATCH] Track {track_id} -> {cid} (Cosine Sim: {best_sim:.2f})")
-        else:
-            # Register new customer profile in gallery
-            cid = f"CUST_{self._next_cust_idx}"
-            self._next_cust_idx += 1
-            self.gallery[cid] = emb
-            print(f"[REID NEW] Track {track_id} registered as {cid}")
-
-        self.track_to_cid[track_id] = cid
-        if state_mgr:
-            state_mgr.register_customer(cid)
-            state_mgr.link_track_to_customer(track_id, cid)
-
+    def match_or_register(self, frame: np.ndarray, bbox: tuple, track_id: int, state_mgr=None) -> str:
+        cid, _ = self.associate_cam2_track(frame, bbox, track_id, f"CAM2-T{track_id}", state_mgr)
         return cid
+
+    def clean_stale_tracks(self, max_age_seconds: float = 30.0) -> None:
+        now = time.monotonic()
+        for tid in [tid for tid, data in self._samples.items() if now - data["last_seen"] > max_age_seconds]:
+            self._samples.pop(tid, None)

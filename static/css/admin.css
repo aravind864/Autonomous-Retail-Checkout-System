@@ -1,9 +1,6 @@
-/* ═══════════════════════════════════════════════════════
-   Autonomous Retail – Admin Dark Theme
-   Premium glassmorphism design with rich animations
-   ═══════════════════════════════════════════════════════ */
+/* Autonomous Retail admin console stylesheet */
 
-/* ─── Design Tokens ─── */
+/* Design Tokens */
 :root {
     --bg-primary:    #0a0e17;
     --bg-secondary:  #111827;
@@ -39,7 +36,7 @@
     --transition:    all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ─── Reset ─── */
+/* Reset */
 *, *::before, *::after {
     margin: 0;
     padding: 0;
@@ -55,7 +52,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ─── Animated Background Orbs ─── */
+/* Animated Background Orbs */
 .bg-orb {
     position: fixed;
     border-radius: 50%;
@@ -96,9 +93,7 @@ body {
     50%      { transform: translate(40px, -50px) scale(1.12); }
 }
 
-/* ════════════════════════════════════════════════════════
-   LOGIN PAGE
-   ════════════════════════════════════════════════════════ */
+
 
 .login-page {
     display: flex;
@@ -327,16 +322,14 @@ body {
     letter-spacing: 0.05em;
 }
 
-/* ════════════════════════════════════════════════════════
-   ADMIN PANEL PAGE
-   ════════════════════════════════════════════════════════ */
+
 
 .admin-page {
     background: var(--bg-primary);
     min-height: 100vh;
 }
 
-/* ─── Navigation Bar ─── */
+/* Navigation Bar */
 .admin-nav {
     position: sticky;
     top: 0;
@@ -409,7 +402,7 @@ body {
     border-color: rgba(239, 68, 68, 0.4);
 }
 
-/* ─── Main Content ─── */
+/* Main Content */
 .admin-main {
     position: relative;
     z-index: 1;
@@ -437,7 +430,7 @@ body {
     margin-top: 6px;
 }
 
-/* ─── Config Cards Grid ─── */
+/* Config Cards Grid */
 .admin-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -516,7 +509,7 @@ body {
     margin-top: 2px;
 }
 
-/* ─── Camera Form ─── */
+/* Camera Form */
 .config-form {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -643,7 +636,7 @@ body {
     transform: none;
 }
 
-/* ─── Shelf Table ─── */
+/* Shelf Table */
 .shelf-table-wrapper {
     overflow-x: auto;
     border-radius: var(--radius-sm);
@@ -702,7 +695,7 @@ body {
     font-size: 0.72rem;
 }
 
-/* ─── Server Info Grid ─── */
+/* Server Info Grid */
 .server-info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -746,7 +739,7 @@ body {
     text-decoration: underline;
 }
 
-/* ─── Quick Actions ─── */
+/* Quick Actions */
 .actions-list {
     display: flex;
     flex-direction: column;
@@ -782,7 +775,7 @@ body {
     color: var(--accent);
 }
 
-/* ─── Toast Notifications ─── */
+/* Toast Notifications */
 .toast-container {
     position: relative;
     margin-top: 16px;
@@ -818,7 +811,7 @@ body {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── Responsive ─── */
+/* Responsive */
 @media (max-width: 768px) {
     .admin-nav {
         padding: 10px 16px;

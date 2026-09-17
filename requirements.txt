@@ -1,6 +1,27 @@
+# Web framework
 flask>=3.0.0
+werkzeug>=3.0.0
+
+# Database
+flask-sqlalchemy>=3.1.0
+psycopg2-binary>=2.9.0
+pgvector>=0.2.0
+
+# Computer vision & AI
 opencv-python>=4.9.0
 ultralytics>=8.0.0
-qrcode[pil]>=7.4.2
-python-dotenv>=1.0.0
+numpy>=1.24.0
 
+# Person Re-ID (reid_engine.py)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Face recognition
+insightface>=0.7.0
+onnxruntime>=1.16.0
+
+# Authentication & security
+bcrypt>=4.0.0
+
+# Configuration
+python-dotenv>=1.0.0
