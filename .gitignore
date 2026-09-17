@@ -1,10 +1,100 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# C/C++ extensions and build artifacts
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment variables, credentials, and local runtime settings
 .env
-config.json
-config.local.json
-kernel.errors.txt
-*.onnx
+.env.*
+!.env.example
+.camera_settings
+secrets.json
+
+# Local SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+retail_store.db
+
+# Machine Learning weights, checkpoints, exports, and runs
 *.pt
+*.pth
+*.pwf
+*.onnx
+*.engine
+*.tflite
+*_openvino_model/
 yolo26n_openvino_model/
+runs/
+checkpoints/
+.insightface/
+models/
+
+# Application runtime captures, receipts, and recordings
 payment_*.png
+payment_*.jpg
+test_cam*.jpg
+test_cam*.png
+recordings/
+captures/
+data/
+datasets/
+
+# Logs and error outputs
+*.log
+logs/
+kernel.errors.txt
+
+# Unit test and coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Editor and IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini

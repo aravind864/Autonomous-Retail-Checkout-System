@@ -79,14 +79,19 @@
                         <span class="w-3 h-3 rounded-full bg-blue-500"></span>
                         Entry / Exit Cam
                     </h2>
-                    <span class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
+                    <span id="badge_entry" class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                         LIVE
                     </span>
                 </div>
 
                 <div class="relative w-full aspect-video min-h-[380px] sm:min-h-[460px] lg:min-h-[520px] rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner">
-                    <img src="/video_feed_entry" alt="Entry / Exit Cam Stream" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\'text-center p-8\'><svg class=\'w-14 h-14 mx-auto text-slate-600 mb-3\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z\'></path></svg><p class=\'text-sm font-semibold text-slate-400\'>Entry / Exit Cam Offline</p><p class=\'text-xs text-slate-500 mt-1\'>Configure stream URL in Admin Panel</p></div>';">
+                    <img id="stream_entry" src="/video_feed_entry" alt="Entry / Exit Cam Stream" class="w-full h-full object-cover rounded-2xl">
+                    <div id="overlay_entry" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex-col items-center justify-center gap-3 p-6 text-center">
+                        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p class="text-sm font-semibold text-slate-300">Connecting to Entry Camera...</p>
+                        <p class="text-xs text-slate-500">Waiting for stream or check configuration in Admin Panel</p>
+                    </div>
                 </div>
             </div>
 
@@ -97,17 +102,58 @@
                         <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
                         Shelf View Cam
                     </h2>
-                    <span class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
+                    <span id="badge_shelf" class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                         LIVE
                     </span>
                 </div>
 
                 <div class="relative w-full aspect-video min-h-[380px] sm:min-h-[460px] lg:min-h-[520px] rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner">
-                    <img src="/video_feed_shelf" alt="Shelf Cam Stream" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\'text-center p-8\'><svg class=\'w-14 h-14 mx-auto text-slate-600 mb-3\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z\'></path></svg><p class=\'text-sm font-semibold text-slate-400\'>Shelf Cam Offline</p><p class=\'text-xs text-slate-500 mt-1\'>Configure stream URL in Admin Panel</p></div>';">
+                    <img id="stream_shelf" src="/video_feed_shelf" alt="Shelf Cam Stream" class="w-full h-full object-cover rounded-2xl">
+                    <div id="overlay_shelf" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex-col items-center justify-center gap-3 p-6 text-center">
+                        <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p class="text-sm font-semibold text-slate-300">Connecting to Shelf Camera...</p>
+                        <p class="text-xs text-slate-500">Waiting for stream or check configuration in Admin Panel</p>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- Resilient Stream Auto-Reconnect Logic -->
+    <script>
+        function setupResilientStream(imgId, overlayId, endpoint) {
+            const img = document.getElementById(imgId);
+            const overlay = document.getElementById(overlayId);
+            if (!img) return;
+
+            let retryTimeout = null;
+
+            function onError() {
+                if (overlay) {
+                    overlay.classList.remove('hidden');
+                    overlay.classList.add('flex');
+                }
+                clearTimeout(retryTimeout);
+                retryTimeout = setTimeout(() => {
+                    img.src = endpoint + '?t=' + Date.now();
+                }, 1500);
+            }
+
+            function onLoad() {
+                if (overlay) {
+                    overlay.classList.add('hidden');
+                    overlay.classList.remove('flex');
+                }
+            }
+
+            img.addEventListener('error', onError);
+            img.addEventListener('load', onLoad);
+        }
+
+        setupResilientStream('stream_entry', 'overlay_entry', '/video_feed_entry');
+        setupResilientStream('stream_shelf', 'overlay_shelf', '/video_feed_shelf');
+    </script>
 </body>
 </html>
+

@@ -1,17 +1,13 @@
-/* ═══════════════════════════════════════════════════════
-   Admin Panel – Client-side Logic
-   Camera config save, test connection, reload config
-   ═══════════════════════════════════════════════════════ */
+// Admin panel client-side handlers for camera configuration and testing.
 
 (function () {
     'use strict';
 
-    // ─── Helper: Show toast notification ───
+    // Display temporary toast notification.
     function showToast(containerId, message, type) {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        // Clear previous toast
         container.innerHTML = '';
 
         const icons = {
@@ -22,10 +18,17 @@
 
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-        toast.innerHTML = `${icons[type] || icons.info} <span>${message}</span>`;
+
+        const iconSpan = document.createElement('span');
+        iconSpan.innerHTML = icons[type] || icons.info;
+        toast.appendChild(iconSpan);
+
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = message;
+        toast.appendChild(msgSpan);
+
         container.appendChild(toast);
 
-        // Auto-remove after 5 seconds
         setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(-8px)';
@@ -33,7 +36,7 @@
         }, 5000);
     }
 
-    // ─── Save Camera Config ───
+    // Save camera configuration.
     const cameraForm = document.getElementById('camera-form');
     if (cameraForm) {
         cameraForm.addEventListener('submit', async function (e) {
@@ -48,7 +51,6 @@
                 return;
             }
 
-            // Disable button and show loading state
             const originalHTML = saveBtn.innerHTML;
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<span class="btn-loader" style="display:inline-block;width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite"></span> Saving…';
@@ -66,9 +68,8 @@
                 const data = await response.json();
 
                 if (response.ok && data.status === 'success') {
-                    showToast('camera-toast', '✓ Camera settings saved to config.json and live streams updated!', 'success');
+                    showToast('camera-toast', '✓ Camera settings saved and live streams updated!', 'success');
                 } else {
-
                     showToast('camera-toast', data.message || 'Failed to save settings.', 'error');
                 }
             } catch (err) {
@@ -80,7 +81,7 @@
         });
     }
 
-    // ─── Test Camera Connection ───
+    // Test camera connection.
     const testBtn = document.getElementById('btn-test-cameras');
     if (testBtn) {
         testBtn.addEventListener('click', async function () {
@@ -127,7 +128,7 @@
         });
     }
 
-    // ─── Reload Config ───
+    // Reload active configuration.
     const reloadBtn = document.getElementById('btn-reload-config');
     if (reloadBtn) {
         reloadBtn.addEventListener('click', async function () {
