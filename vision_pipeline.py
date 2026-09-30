@@ -9,6 +9,9 @@ from ultralytics import YOLO
 from urllib.parse import urlparse, urlunparse
 from reid_engine import PersonReIDEngine
 from ai.entry_face_manager import EntryFaceManager, get_customer_color
+from services.shelf_roi_service import is_person_in_shelf_roi, is_person_in_exit_roi, get_shelf_roi, get_exit_roi
+from services.pose_interaction_service import PoseInteractionManager
+import config as app_config
 
 
 MODEL_WEIGHTS = "yolo26n_openvino_model"
@@ -148,6 +151,20 @@ def _draw_boxes(frame: np.ndarray, boxes: list, cam_title: str = "CAMERA",
     """Draw bounding boxes and ID banners for verified customers."""
     annotated = frame.copy()
 
+    # Draw shelf ROI overlay if enabled and this is the shelf camera
+    if cam_title == "SHELF CAM" and getattr(app_config, "SHELF_ROI_SHOW_OVERLAY", True):
+        roi = get_shelf_roi()
+        cv2.rectangle(annotated, (roi[0], roi[1]), (roi[2], roi[3]), (0, 255, 255), 2)
+        cv2.putText(annotated, "SHELF ROI", (roi[0] + 5, roi[1] + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
+
+    # Draw exit ROI overlay if enabled and this is the entry camera
+    if cam_title == "ENTRY CAM" and getattr(app_config, "SHELF_ROI_SHOW_OVERLAY", True):
+        roi = get_exit_roi()
+        cv2.rectangle(annotated, (roi[0], roi[1]), (roi[2], roi[3]), (0, 0, 255), 2)
+        cv2.putText(annotated, "EXIT ROI", (roi[0] + 5, roi[1] + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+
     for b in boxes:
         tid = b["track_id"]
         x1, y1, x2, y2 = b["bbox"]
@@ -163,22 +180,46 @@ def _draw_boxes(frame: np.ndarray, boxes: list, cam_title: str = "CAMERA",
 
         customer_id = str(cid or "")
         is_verified = bool(customer_id) and not customer_id.startswith(("TRACK_", "CAM2-", "YOLO"))
-        if not is_verified:
+
+        # For shelf cam, also show unverified tracks if they have activity
+        show_box = is_verified
+        badge_text = b.get("badge", "")
+        if cam_title == "SHELF CAM" and not is_verified and b.get("track_id", -1) > 0:
+            show_box = True
+            customer_id = f"CAM2-T{b.get('track_id', 0) - CAM2_TRACK_OFFSET}"
+
+        if not show_box:
             continue
 
-        colour = get_customer_color(customer_id)
+        colour = b.get("color", get_customer_color(customer_id))
 
         cv2.rectangle(annotated, (x1, y1), (x2, y2), colour, 2)
-        (tw, th), _ = cv2.getTextSize(customer_id, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 1)
 
-        banner_top = max(0, y1 - th - 12)
+        # Build display lines
+        display_lines = [customer_id]
+        if badge_text:
+            for part in badge_text.split(" | "):
+                if part.strip():
+                    display_lines.append(part.strip())
+
+        line_height = 16
+        total_h = len(display_lines) * line_height + 8
+        banner_top = max(0, y1 - total_h)
         banner_bottom = y1
-        banner_right = min(annotated.shape[1], x1 + tw + 16)
+
+        max_tw = 0
+        for line in display_lines:
+            (tw, _), _ = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)
+            max_tw = max(max_tw, tw)
+        banner_right = min(annotated.shape[1], x1 + max_tw + 16)
+
         cv2.rectangle(annotated, (x1, banner_top), (banner_right, banner_bottom), colour, -1)
 
-        text_y = max(th + 4, banner_bottom - 5)
-        cv2.putText(annotated, customer_id, (x1 + 6, text_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 1, cv2.LINE_AA)
+        for i, line in enumerate(display_lines):
+            text_y = banner_top + (i + 1) * line_height
+            cv2.putText(annotated, line, (x1 + 4, text_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
+
     return annotated
 
 
@@ -323,6 +364,7 @@ class BatchedDetector:
 
         self.reid_engine = PersonReIDEngine(sim_threshold=0.75)
         self.entry_face_mgr = EntryFaceManager(state_mgr=self.state_mgr, reid_engine=self.reid_engine)
+        self.pose_mgr = PoseInteractionManager()
 
         self._frame_lock = threading.Lock()
         self._ann_frame1 = self._make_standby_frame("Entry Camera", "Initializing...")
@@ -447,6 +489,7 @@ class BatchedDetector:
                     self._ann_frame1 = ann1
                     self._ann_frame2 = ann2
                 self.reid_engine.clean_stale_tracks()
+                self.pose_mgr.clean_stale()
 
             except Exception as e:
                 print(f"[BATCHED] detect_loop error (thread kept alive): {e}")
@@ -479,11 +522,67 @@ class BatchedDetector:
                 if is_entry:
                     self.entry_face_mgr.process_track_frame(frame, (x1, y1, x2, y2), tid)
                     disp_cid, color, badge = self.entry_face_mgr.get_display_info(tid)
+
+                    # Exit ROI detection
+                    if disp_cid and not disp_cid.startswith(("TRACK_", "YOLO")):
+                        if is_person_in_exit_roi((x1, y1, x2, y2)):
+                            try:
+                                from services.session_service import handle_exit_detection
+                                from database.connection import app_context_guard
+                                with app_context_guard():
+                                    exit_res = handle_exit_detection(disp_cid, self.state_mgr)
+                                    if exit_res.get("exit_allowed"):
+                                        badge = "EXIT ALLOWED"
+                                    else:
+                                        badge = "EXIT BLOCKED"
+                            except Exception:
+                                pass
                 else:
                     disp_cid, badge = self.reid_engine.associate_cam2_track(
                         frame, (x1, y1, x2, y2), tid, f"CAM2-T{raw_tid}", self.state_mgr
                     )
                     color = get_customer_color(disp_cid)
+
+                    # --- Shelf ROI check ---
+                    in_shelf = is_person_in_shelf_roi((x1, y1, x2, y2))
+
+                    # Link cam2 track to session if matched
+                    cust_id = self.state_mgr.get_customer_for_cam2_track(tid) if self.state_mgr else None
+                    sess_id = self.state_mgr.get_session_for_cam2_track(tid) if self.state_mgr else None
+
+                    if not cust_id and disp_cid and not disp_cid.startswith(("CAM2-", "TRACK_", "YOLO")):
+                        cust_id = disp_cid
+                        if self.state_mgr:
+                            sess_id = self.state_mgr.get_session_for_customer(cust_id)
+                            if sess_id:
+                                self.state_mgr.link_cam2_track(tid, cust_id, sess_id)
+
+                    # --- Pose inference (only when in shelf ROI) ---
+                    pose_info = self.pose_mgr.get_display_info(tid)
+                    if in_shelf:
+                        self.pose_mgr.update_roi_status(tid, True, cust_id, sess_id)
+                        if self.pose_mgr.should_run_pose(tid, True):
+                            self.pose_mgr.run_pose_inference(
+                                frame, (x1, y1, x2, y2), tid,
+                                customer_id=cust_id, session_id=sess_id
+                            )
+                            if self.state_mgr:
+                                self.pose_mgr.sync_to_state_manager(tid, self.state_mgr)
+                        pose_info = self.pose_mgr.get_display_info(tid)
+                    else:
+                        self.pose_mgr.update_roi_status(tid, False, cust_id, sess_id)
+                        if self.state_mgr:
+                            self.pose_mgr.sync_to_state_manager(tid, self.state_mgr)
+
+                    # Build enhanced badge
+                    badge_parts = [badge]
+                    if in_shelf:
+                        badge_parts.append("SHELF")
+                    if pose_info.get("pose_status"):
+                        badge_parts.append(pose_info["pose_status"])
+                    if pose_info.get("interaction_status"):
+                        badge_parts.append(pose_info["interaction_status"])
+                    badge = " | ".join(badge_parts)
 
                 tracks_out[tid] = (cx, cy)
                 boxes_out.append({

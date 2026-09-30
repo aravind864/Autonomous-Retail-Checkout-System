@@ -98,3 +98,7 @@ htmlcov/
 ehthumbs.db
 Thumbs.db
 desktop.ini
+
+# Tool and AI agent metadata
+.freebuff/
+.gemini/

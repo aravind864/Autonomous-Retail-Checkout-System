@@ -38,6 +38,44 @@ FACE_DETECTION_CONF_MIN = 0.40
 
 UNIFORM_BOX_COLOR = False
 
+# === Shopping Session ===
+SESSION_ID_PREFIX = "SESS"
+
+# === Shelf Interaction ROI (Camera 2) ===
+SHELF_ROI_X1 = int(os.getenv("SHELF_ROI_X1", 200))
+SHELF_ROI_Y1 = int(os.getenv("SHELF_ROI_Y1", 100))
+SHELF_ROI_X2 = int(os.getenv("SHELF_ROI_X2", 600))
+SHELF_ROI_Y2 = int(os.getenv("SHELF_ROI_Y2", 450))
+SHELF_ROI = (SHELF_ROI_X1, SHELF_ROI_Y1, SHELF_ROI_X2, SHELF_ROI_Y2)
+SHELF_ROI_OVERLAP_THRESHOLD = float(os.getenv("SHELF_ROI_OVERLAP_THRESHOLD", 0.20))
+SHELF_ROI_SHOW_OVERLAY = os.getenv("SHELF_ROI_SHOW_OVERLAY", "true").lower() in ("1", "true", "yes")
+
+# === Exit ROI (Camera 1) ===
+EXIT_ROI_X1 = int(os.getenv("EXIT_ROI_X1", 0))
+EXIT_ROI_Y1 = int(os.getenv("EXIT_ROI_Y1", 350))
+EXIT_ROI_X2 = int(os.getenv("EXIT_ROI_X2", 200))
+EXIT_ROI_Y2 = int(os.getenv("EXIT_ROI_Y2", 480))
+EXIT_ROI = (EXIT_ROI_X1, EXIT_ROI_Y1, EXIT_ROI_X2, EXIT_ROI_Y2)
+
+# === YOLO11n-Pose ===
+POSE_MODEL_WEIGHTS = os.getenv("POSE_MODEL_WEIGHTS", "yolo11n-pose.pt")
+POSE_CONF = float(os.getenv("POSE_CONF", 0.3))
+POSE_IMGSZ = int(os.getenv("POSE_IMGSZ", 256))
+POSE_INFERENCE_INTERVAL = float(os.getenv("POSE_INFERENCE_INTERVAL", 0.10))
+
+# === Weight Sensor ===
+WEIGHT_CHANGE_MIN_GRAMS = float(os.getenv("WEIGHT_CHANGE_MIN_GRAMS", 20.0))
+WEIGHT_STABILITY_TOLERANCE_GRAMS = float(os.getenv("WEIGHT_STABILITY_TOLERANCE_GRAMS", 5.0))
+WEIGHT_EVENT_ASSOCIATION_WINDOW_SECONDS = float(os.getenv("WEIGHT_EVENT_ASSOCIATION_WINDOW_SECONDS", 3.0))
+WEIGHT_ASSOCIATION_MIN_CONFIDENCE = float(os.getenv("WEIGHT_ASSOCIATION_MIN_CONFIDENCE", 0.5))
+WEIGHT_EVENT_DEBOUNCE_SECONDS = float(os.getenv("WEIGHT_EVENT_DEBOUNCE_SECONDS", 1.0))
+
+# === Development Mode ===
+DEV_MODE = os.getenv("DEV_MODE", "true").lower() in ("1", "true", "yes")
+
+# === Tax ===
+TAX_RATE = float(os.getenv("TAX_RATE", 0.0))
+
 
 class Config:
     _env_secret = os.getenv("FLASK_SECRET_KEY")

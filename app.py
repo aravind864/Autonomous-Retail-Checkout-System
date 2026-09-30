@@ -14,11 +14,14 @@ from database.connection import get_connection
 from api.customer import customer_api
 from api.auth import auth_api
 from api.face import face_api
+from api.shopping import shopping_api
+from api.dev import dev_api, set_state_manager as dev_set_state_mgr
 from state_manager import GlobalStateManager
 from vision_pipeline import VisionSystem
 
 state_mgr = GlobalStateManager()
 vision_sys = VisionSystem(state_mgr)
+dev_set_state_mgr(state_mgr)
 
 ADMIN_USER = os.getenv("ADMIN_USER")
 ADMIN_PASS = os.getenv("ADMIN_PASS")
@@ -91,6 +94,16 @@ def create_app(config_class=Config):
     app.register_blueprint(customer_api)
     app.register_blueprint(auth_api)
     app.register_blueprint(face_api)
+    app.register_blueprint(shopping_api)
+    app.register_blueprint(dev_api)
+
+    # Seed test product data in dev mode
+    with app.app_context():
+        try:
+            from services.product_service import seed_test_data
+            seed_test_data()
+        except Exception as e:
+            app.logger.warning(f"Product seed skipped: {e}")
 
     @app.after_request
     def set_security_headers(response):

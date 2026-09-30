@@ -279,6 +279,16 @@ class EntryFaceManager:
                     if self.state_mgr:
                         self.state_mgr.register_customer(cid)
                         self.state_mgr.link_track_to_customer(track_id, cid)
+                        try:
+                            from services.session_service import get_or_create_active_session
+                            from database.connection import app_context_guard
+                            with app_context_guard():
+                                sess_res = get_or_create_active_session(cid, camera1_track_id=track_id)
+                                sess = sess_res.get("session")
+                                if sess:
+                                    self.state_mgr.register_session(cid, sess.session_id, camera1_track_id=track_id)
+                        except Exception as sess_exc:
+                            logger.error(f"[ENTRY FACE] Error establishing session for {cid}: {sess_exc}")
 
                     if self.reid_engine:
                         try:
