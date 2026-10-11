@@ -5,6 +5,7 @@ import numpy as np
 import bcrypt
 
 from database.connection import get_connection
+from config import FACE_MATCH_MEDIUM_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -248,8 +249,17 @@ def enroll_face(customer_id, front_embedding, left_embedding, right_embedding):
         connection.close()
 
 
-def identify_customer_by_face_embedding(embedding, limit=1):
-    """Match face embedding against customer database using pgvector cosine similarity."""
+def identify_customer_by_face_embedding(embedding, limit=1, min_similarity=FACE_MATCH_MEDIUM_THRESHOLD):
+    """Match face embedding against customer database using pgvector cosine similarity.
+
+    Args:
+        embedding: 512-dim face embedding vector.
+        limit: Maximum number of results to return.
+        min_similarity: Minimum cosine similarity to consider a valid match.
+            Defaults to FACE_MATCH_MEDIUM_THRESHOLD (0.18) — faces below this
+            are clearly unregistered and would be rejected by EntryFaceManager
+            anyway. This prevents returning garbage matches for strangers.
+    """
     if embedding is None:
         return None
 
@@ -293,7 +303,7 @@ def identify_customer_by_face_embedding(embedding, limit=1):
             row = cursor.fetchone()
             if row and row["similarity"] is not None:
                 sim = float(row["similarity"])
-                if not np.isnan(sim):
+                if not np.isnan(sim) and sim >= min_similarity:
                     first_name = row["first_name"] or ""
                     last_name = row["last_name"] or ""
                     name = f"{first_name} {last_name}".strip()
